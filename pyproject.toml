@@ -1,6 +1,6 @@
 [project]
 name = "compact-frame-format"
-version = "1.0.0rc1"
+version = "1.0.0rc2"
 description = "Python reference implementation of Compact Frame Format, a simple, low-overhead frame format designed for fast, reliable serial links."
 readme = "README.md"
 authors = [{name = "R. Keelan"}]
