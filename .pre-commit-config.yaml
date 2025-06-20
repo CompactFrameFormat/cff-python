@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.0
+    hooks:
+      # Run the linter.
+      - id: ruff
+        args: []
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      # Check for files that parse as valid YAML but have inconsistent formatting
+      - id: check-yaml
+      # Check for files that parse as valid JSON but have inconsistent formatting
+      - id: check-json
+      # Check for files that parse as valid TOML but have inconsistent formatting
+      - id: check-toml
+      # Check for files that would conflict in case-insensitive filesystems
+      - id: check-case-conflict
+      # Check for files that contain merge conflict strings
+      - id: check-merge-conflict

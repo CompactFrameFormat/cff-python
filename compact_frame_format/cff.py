@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Optional
 
 # Protocol constants
-PREAMBLE = b'\xFA\xCE'
+PREAMBLE = b"\xFA\xCE"  # fmt: skip
 PREAMBLE_SIZE = 2
 FRAME_COUNTER_SIZE_BYTES = 2
 PAYLOAD_SIZE_BYTES = 2
@@ -20,13 +20,14 @@ HEADER_SIZE_BYTES = PREAMBLE_SIZE + FRAME_COUNTER_SIZE_BYTES + PAYLOAD_SIZE_BYTE
 MAX_FRAME_COUNT = 65535
 
 # Struct format strings for packing/unpacking
-_HEADER_FORMAT = '<2sHH'  # preamble (2 bytes), frame_counter (H), payload_size (H)
-_CRC_FORMAT = '<H'  # CRC value (H)
+_HEADER_FORMAT = "<2sHH"  # preamble (2 bytes), frame_counter (H), payload_size (H)
+_CRC_FORMAT = "<H"  # CRC value (H)
 _HEADER_UNPACK_SIZE = struct.calcsize(_HEADER_FORMAT)
 _CRC_UNPACK_SIZE = struct.calcsize(_CRC_FORMAT)
 
 # CRC-16/CCITT-FALSE lookup table (pre-computed for performance)
-_CRC_TABLE = tuple([
+# fmt: off
+_CRC_TABLE = (
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
     0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
     0x1231, 0x0210, 0x3273, 0x2252, 0x52b5, 0x4294, 0x72f7, 0x62d6,
@@ -59,15 +60,17 @@ _CRC_TABLE = tuple([
     0x7c26, 0x6c07, 0x5c64, 0x4c45, 0x3ca2, 0x2c83, 0x1ce0, 0x0cc1,
     0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
     0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0
-])
+)
+# fmt: on
 
 
 @dataclass(frozen=True)
 class CFrame:
     """Represents a parsed frame with payload and counter."""
+
     frame_counter: int
     payload: bytes
-    
+
     @property
     def frame_length(self) -> int:
         """Calculate the total frame length for this frame."""
@@ -76,6 +79,7 @@ class CFrame:
 
 class ParseResultEnum(Enum):
     """Enumeration of possible parse results."""
+
     SUCCESS = "success"
     FRAME_TOO_SHORT = "frame_too_short"
     INVALID_PREAMBLE = "invalid_preamble"
@@ -88,44 +92,45 @@ class ParseResultEnum(Enum):
 
 class FrameError(Exception):
     """Base exception for frame-related errors."""
+
     pass
 
 
 class Cff:
     """
     Compact Frame Format handler with automatic frame counter management.
-    
+
     This class provides methods to create and parse frames with an internal
     frame counter that automatically increments.
     """
-    
+
     def __init__(self, initial_frame_count: int = 0) -> None:
         """
         Initialize Frame handler with optional initial frame count.
-        
+
         Args:
             initial_frame_count: Starting value for frame counter (0-MAX_FRAME_COUNT), defaults to 0
-            
+
         Raises:
             FrameError: If initial_frame_count is out of range
         """
         if not (0 <= initial_frame_count <= MAX_FRAME_COUNT):
             raise FrameError(f"Initial frame count must be between 0 and {MAX_FRAME_COUNT}, got {initial_frame_count}")
         self._counter = initial_frame_count
-    
+
     @property
     def current_counter(self) -> int:
         """Current frame counter value."""
         return self._counter
-    
+
     @staticmethod
     def calculate_crc(data: bytes) -> int:
         """
         Calculate CRC for given data.
-        
+
         Args:
             data: Input bytes for which to calculate the CRC
-            
+
         Returns:
             CRC-16 value as integer
         """
@@ -134,31 +139,31 @@ class Cff:
             tbl_idx = ((crc >> 8) ^ byte) & 0xFF
             crc = ((crc << 8) ^ _CRC_TABLE[tbl_idx]) & 0xFFFF
         return crc
-    
+
     @staticmethod
     def frame_length(payload_length: int) -> int:
         """
         Calculate the frame length for a given payload length.
-        
+
         Args:
             payload_length: Length of the payload in bytes
-            
+
         Returns:
             Frame length in bytes
         """
         return HEADER_SIZE_BYTES + payload_length + PAYLOAD_CRC_SIZE_BYTES
-    
+
     def create(self, payload: bytes, frame_counter: Optional[int] = None) -> bytes:
         """
         Create a frame with the given payload.
-        
+
         Args:
             payload: Payload data as bytes
             frame_counter: Optional frame counter value (0-MAX_FRAME_COUNT). If None, uses internal counter
-            
+
         Returns:
             Complete frame as bytes
-            
+
         Raises:
             FrameError: If frame_counter is out of range
         """
@@ -170,24 +175,24 @@ class Cff:
         else:
             current_counter = self._counter
             self._counter = (self._counter + 1) % (MAX_FRAME_COUNT + 1)
-        
+
         # Create the header
         header = struct.pack(_HEADER_FORMAT, PREAMBLE, current_counter, len(payload))
-        
+
         # Calculate CRCs
         header_crc = self.calculate_crc(header)
         payload_crc = self.calculate_crc(payload)
-        
+
         # Assemble the frame
         return header + struct.pack(_CRC_FORMAT, header_crc) + payload + struct.pack(_CRC_FORMAT, payload_crc)
-    
+
     def parse(self, data: bytes) -> tuple[Optional[CFrame], ParseResultEnum]:
         """
         Parse a frame from the given data.
-        
+
         Args:
             data: Raw frame data as bytes
-            
+
         Returns:
             Tuple of (CFrame, ParseResultEnum) where CFrame is None if parsing failed
         """
@@ -195,64 +200,64 @@ class Cff:
         min_frame_size = HEADER_SIZE_BYTES + PAYLOAD_CRC_SIZE_BYTES
         if len(data) < min_frame_size:
             return (None, ParseResultEnum.FRAME_TOO_SHORT)
-        
+
         try:
             # Extract header fields
             preamble, frame_counter, payload_size = struct.unpack(_HEADER_FORMAT, data[:_HEADER_UNPACK_SIZE])
-            
+
             # Verify preamble
             if preamble != PREAMBLE:
                 return (None, ParseResultEnum.INVALID_PREAMBLE)
-            
+
             # Check if we have enough data for the complete frame
             expected_total_length = self.frame_length(payload_size)
             if len(data) < expected_total_length:
                 return (None, ParseResultEnum.INCOMPLETE_FRAME)
-            
+
             # Extract header CRC
             header_crc_offset = _HEADER_UNPACK_SIZE
-            header_crc = struct.unpack(_CRC_FORMAT, data[header_crc_offset:header_crc_offset + _CRC_UNPACK_SIZE])[0]
-            
+            header_crc = struct.unpack(_CRC_FORMAT, data[header_crc_offset : header_crc_offset + _CRC_UNPACK_SIZE])[0]
+
             # Verify header CRC
             header_data = data[:_HEADER_UNPACK_SIZE]
             calculated_header_crc = self.calculate_crc(header_data)
             if header_crc != calculated_header_crc:
                 return (None, ParseResultEnum.HEADER_CRC_MISMATCH)
-            
+
             # Extract payload and payload CRC
             payload_start = HEADER_SIZE_BYTES
             payload_end = payload_start + payload_size
             payload = data[payload_start:payload_end]
-            
-            payload_crc = struct.unpack(_CRC_FORMAT, data[payload_end:payload_end + _CRC_UNPACK_SIZE])[0]
-            
+
+            payload_crc = struct.unpack(_CRC_FORMAT, data[payload_end : payload_end + _CRC_UNPACK_SIZE])[0]
+
             # Verify payload CRC
             calculated_payload_crc = self.calculate_crc(payload)
             if payload_crc != calculated_payload_crc:
                 return (None, ParseResultEnum.PAYLOAD_CRC_MISMATCH)
-            
+
             cframe = CFrame(frame_counter, payload)
             return (cframe, ParseResultEnum.SUCCESS)
-            
-        except struct.error as e:
+
+        except struct.error:
             return (None, ParseResultEnum.STRUCT_ERROR)
-        except Exception as e:
+        except Exception:
             return (None, ParseResultEnum.UNEXPECTED_ERROR)
-    
+
     def find_frame(self, data: bytes) -> tuple[Optional[CFrame], int]:
         """
         Search through the bytes until a valid frame is found.
-        
+
         Args:
             data: Raw data that may contain one or more frames
-            
-        Returns: 
+
+        Returns:
             Tuple of (CFrame, bytes_consumed) where bytes_consumed is the number of bytes
             consumed from the stream. If no frame is found, CFrame is None and bytes_consumed
             is the length of the input data.
         """
         min_search_length = len(data) - HEADER_SIZE_BYTES - PAYLOAD_CRC_SIZE_BYTES + 1
-        
+
         # Look for the preamble pattern
         search_start = 0
         while search_start < min_search_length:
@@ -260,51 +265,51 @@ class Cff:
             preamble_pos = data.find(PREAMBLE[0], search_start)
             if preamble_pos == -1 or preamble_pos >= min_search_length:
                 break
-            
+
             # Check if we have the full preamble
-            if data[preamble_pos:preamble_pos + PREAMBLE_SIZE] == PREAMBLE:
+            if data[preamble_pos : preamble_pos + PREAMBLE_SIZE] == PREAMBLE:
                 # Found potential frame start, try to parse it
                 remaining_data = data[preamble_pos:]
                 cframe, result = self.parse(remaining_data)
                 if result == ParseResultEnum.SUCCESS:
                     bytes_consumed = preamble_pos + cframe.frame_length
                     return (cframe, bytes_consumed)
-            
+
             search_start = preamble_pos + 1
-        
+
         # No frame found, consumed all data
         return (None, len(data))
-    
+
     def parse_frames(self, data: bytes) -> tuple[list[CFrame], int]:
         """
         Find all frames in a byte stream.
-        
+
         Args:
             data: Raw data that may contain multiple frames
-            
+
         Returns:
-            Tuple of (frames_list, total_bytes_consumed) where frames_list contains all valid 
-            frames found and total_bytes_consumed is the total number of bytes consumed from 
+            Tuple of (frames_list, total_bytes_consumed) where frames_list contains all valid
+            frames found and total_bytes_consumed is the total number of bytes consumed from
             the input data.
         """
         frames = []
         remaining_data = data
         total_consumed = 0
-        
+
         while remaining_data:
             cframe, bytes_consumed = self.find_frame(remaining_data)
             if not cframe:
                 # No more frames found, add remaining bytes to total consumed
                 total_consumed += bytes_consumed
                 break
-            
+
             # Add frame to list and track consumed bytes
             frames.append(cframe)
             total_consumed += bytes_consumed
-            
+
             # Advance past the consumed bytes
             if bytes_consumed >= len(remaining_data):
                 break
             remaining_data = remaining_data[bytes_consumed:]
-        
+
         return (frames, total_consumed)
